@@ -3,7 +3,6 @@
   "extends": [
     "github>Inthememory/renovate-config:library"
   ],
-  "assignees": [
-    "jpolo"
-  ]
+  "assigneesSampleSize": 1,
+  "assignees": ["jpolo"]
 }
