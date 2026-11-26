@@ -6,4 +6,8 @@ class Laptop < Formula
   def install
     system "INSTALL_PREFIX='#{prefix}' INSTALL_BREW_PACKAGE=Inthememory/tap/laptop make install"
   end
+
+  test do
+    assert_predicate bin/"laptop", :executable?
+  end
 end
