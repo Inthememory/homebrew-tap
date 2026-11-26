@@ -6,12 +6,24 @@ on:
       - main
   pull_request:
 
+permissions: {}
+
+defaults:
+  run:
+    shell: bash -xeuo pipefail {0}
+
 jobs:
   test-bot:
     strategy:
       matrix:
-        os: [ ubuntu-22.04, macos-15-intel, macos-26 ]
+        os: [ macos-26 ]
+        include:
+          - os: ubuntu-latest
+            container:
+              image: ghcr.io/homebrew/brew:main
+              options: --privileged
     runs-on: ${{ matrix.os }}
+    container: ${{ fromJSON(toJSON(matrix.container)) }} # zizmor: ignore[unpinned-images]
     permissions:
       actions: read
       checks: read
@@ -20,12 +32,12 @@ jobs:
     steps:
       - name: Set up Homebrew
         id: set-up-homebrew
-        uses: Homebrew/actions/setup-homebrew@7a2984f77c47b370db00ef04a8531a293b169c9a # main
+        uses: Homebrew/actions/setup-homebrew@ceec4e8419bb3c97ce96e9dda7738499ed5f869d # 2026.11.14.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Homebrew Bundler RubyGems
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.set-up-homebrew.outputs.gems-path }}
           key: ${{ matrix.os }}-rubygems-${{ steps.set-up-homebrew.outputs.gems-hash }}
@@ -36,12 +48,24 @@ jobs:
       - run: brew test-bot --only-setup
 
       - run: brew test-bot --only-tap-syntax
+      # HEAD-only formulae (no `url` / `stable`) cannot be bottled, so test-bot
+      # fails on them. Build bottles only once the tap has a formula that can.
+      - name: Detect bottleable formulae
+        id: bottleable
+        env:
+          TAP_NAME: ${{ steps.set-up-homebrew.outputs.tap-name }}
+        run: |
+          if grep -qE '^\s+(url\s|stable do)' "$(brew --repository "$TAP_NAME")/Formula/"*.rb
+          then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - run: brew test-bot --only-formulae
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.bottleable.outputs.enabled == 'true'
 
       - name: Upload bottles as artifact
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always() && github.event_name == 'pull_request' && steps.bottleable.outputs.enabled == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bottles_${{ matrix.os }}
           path: '*.bottle.*'
