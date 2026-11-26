@@ -31,6 +31,9 @@ jobs:
           key: ${{ matrix.os }}-rubygems-${{ steps.set-up-homebrew.outputs.gems-hash }}
           restore-keys: ${{ matrix.os }}-rubygems-
 
+      - name: Trust this tap
+        run: brew trust --tap inthememory/tap
+
       - run: brew test-bot --only-cleanup-before
 
       - run: brew test-bot --only-setup
